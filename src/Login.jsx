@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, TextField, Button, Stack } from '@mui/material';
+import { Card, CardContent, TextField, Button, Stack, IconButton } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { CheckCircle, Visibility, VisibilityOff } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
-import { Navigate } from 'react-router-dom';
 
-const Login = () => {
+const Login = ({ blockedUsers, setBlockedUsers }) => {
     const [username, setUsername] = useState('');
     const [userNameError, setUsernameError] = useState(false);
     const [passwordError, setPasswordError] = useState(false);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [usernameExists, setUsernameExists] = useState(false);
+    const [loginAttempts, setLoginAttempts] = useState(0);
+    //const [blockedUser, setBlockedUser] = useState(false);
 
     const cardStyle = {
         width: '24rem',
@@ -26,60 +28,155 @@ const Login = () => {
 
     const navigate = useNavigate();
 
-    useEffect(()=>{
+    useEffect(() => {
         const loggedInUser = localStorage.getItem('loggedInUser');
         if (loggedInUser) {
             // Set the logged-in user state if it exists in local storage
             setUsername(loggedInUser);
         }
-    },[])
+        // Fetch block users
+        const fetchBlockedUsers = async () => {
+            try {
+                const response = await axios.get('http://localhost:8000/blockUser');
+                setBlockedUsers(response.data);
+                //console.log(response.data);
+            } catch (error) {
+                console.error('Error fetching blocked users:', error);
+            }
+        };
+        fetchBlockedUsers();
+    }, [])
 
     const handleLogin = async () => {
-        // username validation
+
+        if (username.trim() === '' && password.trim() === '') {
+            toast.error('Username and password cannot be empty!');
+            console.log(blockedUsers);
+            setUsernameError(true);
+            setPasswordError(true);
+            return;
+        }
+
+        if (blockedUsers.some(user => user.userName === username)) {
+            toast.warning('This account is already blocked! Please contact support.');
+            console.log('BLOCK USER:',username);
+            return;
+        }
+
+        // Username validation
         if (!validateUserName(username)) {
             setUsernameError(true);
-            toast.error('Invalid username format');
             return;
         }
         setUsernameError(false);
 
-        // Password validation
-        if (password === '') {
-            setPasswordError(true);
-            toast.error('Password cannot be empty');
-            return;
-        }
-        setPasswordError(false);
         try {
-            // Send login request to your backend API
-            const response = await axios.get('http://localhost:8000/users');
+            const response = await axios.get(`http://localhost:8000/users?userName=${username}`);
             const userData = response.data;
 
-            // Check if username and password match any entry in the user data
-            const user = userData.find(user => user.userName === username && user.password === password);
-            if (user) {
-
-                // Store the logged-in user data in local storage
-                localStorage.setItem('loggedInUser', username);
-
-                setUsername('');
-                setPassword('');
-
-                toast.success('Login successful');
-                navigate('/home');
+            if (userData.length > 0) {
+                // Username exists
+                const user = userData[0]; // Assume username is unique
+                if (user.password === password) {
+                    // Password matches
+                    localStorage.setItem('loggedInUser', username);
+                    setUsername('');
+                    setPassword('');
+                    toast.success('Login successful');
+                    navigate('/home');
+                } else {
+                    // if (blockedUsers.includes(username)) {
+                    //     toast.warning('This account is already blocked! Please contact support..');
+                    //     return;
+                    // }
+                    // else {
+                        //Password does not match
+                        if(password===''){
+                            setPasswordError(true);
+                            toast.error('password can not be empty!');
+                        }
+                        else{
+                        toast.error('Invalid password!, try again');
+                        setLoginAttempts(loginAttempts + 1);
+                        if (loginAttempts >= 2) {
+                            // Block the username after 3 unsuccessful attempts
+                            blockUsername(username);
+                            handleBlockedUserNavigation(username);
+                            return;
+                         }
+                    }
+                }
             } else {
-                toast.error('Invalid username or password');
+                // Username does not exist
+                setUsernameExists(false);
+                toast.error('Username not exists');
             }
         } catch (error) {
-            console.error('Error logging in:', error);
-            toast.error('An error occurred while logging in');
+            console.error('Error checking username:', error);
+            toast.error('An error occurred while checking username');
         }
     };
 
     const validateUserName = (username) => {
+        if (username === '') {
+            toast.error('username cannot be empty!');
+            return;
+        }
         const regex = /^[a-zA-Z0-9]+$/; // Allows only letters and numbers
         return regex.test(username);
     };
+
+    const handleUsernameBlur = async () => {
+        if (!validateUserName(username)) {
+            setUsernameError(true);
+            // toast.error('Invalid username format');
+            return;
+        }
+        setUsernameError(false);
+
+        try {
+            const response = await axios.get(`http://localhost:8000/users?userName=${username}`);
+            const userData = response.data;
+
+            if (userData.length > 0) {
+                // Username exists
+                setUsernameExists(true);
+
+            } else {
+                // Username does not exist
+                setUsernameExists(false);
+                toast.error('Username not exists');
+            }
+        } catch (error) {
+            console.error('Error checking username:', error);
+            toast.error('An error occurred while checking username');
+        }
+    };
+
+    const blockUsername = async () => {
+        try {
+            const response = await axios.get(`http://localhost:8000/users?userName=${username}`);
+            const userData = response.data;
+
+            if(userData.length > 0) {
+                const user = userData[0];
+                await axios.post(`http://localhost:8000/blockUser/`, { id: user.id, userName: user.userName });
+                setBlockedUsers(prevBlockedUsers => [...prevBlockedUsers, { id: user.id, userName: user.userName }]);
+                toast.error('Your account has been blocked due to multiple unsuccessful login attempts.');
+            } else {
+                toast.error('User not found');
+            }
+            
+        } catch (error) {
+            console.error('Error blocking username:', error);
+            toast.error('An error occurred while blocking the username');
+        }
+    };
+
+    const handleBlockedUserNavigation = (blockedUsername) => {
+        navigate('/home', { state: { blockedUser: username } });
+    };
+
 
     return (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
@@ -95,8 +192,21 @@ const Login = () => {
                         placeholder="Enter username"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
+                        onBlur={handleUsernameBlur}
                         error={userNameError}
-                        helperText={userNameError ? 'Invalid username format' : ''}
+                        InputProps={{
+                            endAdornment: (
+                                <IconButton
+                                    edge="end"
+                                    aria-label="username-exists"
+                                    onClick={handleUsernameBlur}
+                                    style={{ visibility: usernameExists ? 'visible' : 'hidden' }} // Show/hide the icon based on username existence
+                                >
+                                    <CheckCircle style={{ color: 'green' }} /> {/* Green checkmark icon */}
+                                </IconButton>
+                            ),
+                        }}
+                        helperText={userNameError ? 'username cannot be empty' : ''}
                     />
                     <TextField
                         type={showPassword ? 'text' : 'password'}

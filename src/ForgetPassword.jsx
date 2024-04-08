@@ -21,68 +21,68 @@ const ForgetPassword = () => {
         borderRadius: '8px',
     };
 
-    const handleBlur = async() => {
-        try{
+    const handleBlur = async () => {
+        try {
             const response = await axios.get(`http://localhost:8000/users?userName=${username}`);
             const userData = response.data;
 
             // check if username is exist
-            if(userData.length === 0){
+            if (userData.length === 0) {
                 toast.error('User not found');
                 return;
             }
             console.log(userData);
             setSecureQuestion(userData[0].secureQuestion);
         }
-        catch(error){
+        catch (error) {
             console.log('Error fetching security question:', error);
             toast.error('An error occurred while fetching security question');
         }
     };
 
-    const handleAnswerBlur = async() => {
+    const handleAnswerBlur = async () => {
         try {
             const response = await axios.get(`http://localhost:8000/users?secureQuestionAnswer=${secureAnswer}`)
             const secureAnswerData = response.data;
 
-            if(secureAnswerData.length===0){
+            if (secureAnswerData.length === 0) {
                 toast.error('An error occurred while fetching security answer');
                 return;
             }
-            if(secureAnswerData[0].secureQuestionAnswer === secureAnswer){
+            if (secureAnswerData[0].secureQuestionAnswer === secureAnswer) {
                 setIsDisabled(false);
                 toast.success('secure answer is correct!');
             }
-            console.log('secureAnswerData:',secureAnswerData[0].secureQuestionAnswer);
+            console.log('secureAnswerData:', secureAnswerData[0].secureQuestionAnswer);
         }
-        catch(error){
+        catch (error) {
 
         }
-    }    
-    
+    }
+
     const handleResetPassword = async () => {
         try {
             // Send a request to fetch user data based on the username
             const response = await axios.get(`http://localhost:8000/users?userName=${username}`);
             const userData = response.data;
             console.log(userData);
-    
+
             // Check if a user with the given username exists
             if (userData.length === 0) {
                 toast.error('User not found');
                 return;
             }
-    
+
             // Extract the user ID from the fetched data
             const user = userData[0];
             const userId = user.id;
-    
+
             // Update the user's password
             user.password = newPassword;
-    
+
             // Send a request to update the user's password
             await axios.put(`http://localhost:8000/users/${userId}`, user);
-    
+
             // Notify the user that the password has been reset
             toast.success('Password reset successful');
         } catch (error) {
@@ -90,7 +90,7 @@ const ForgetPassword = () => {
             toast.error('An error occurred while resetting password');
         }
     };
-    
+
     return (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
             <Card className="draggable-card" style={cardStyle}>
@@ -105,7 +105,7 @@ const ForgetPassword = () => {
                         placeholder="Enter username"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        onBlur={(e)=> handleBlur()}
+                        onBlur={(e) => handleBlur()}
                     />
                     <TextField
                         type="text"
@@ -125,7 +125,7 @@ const ForgetPassword = () => {
                         placeholder="Enter security answer"
                         value={secureAnswer}
                         onChange={(e) => setSecureAnswer(e.target.value)}
-                        onBlur={()=>handleAnswerBlur()}
+                        onBlur={() => handleAnswerBlur()}
                     />
                     <TextField
                         type="password"

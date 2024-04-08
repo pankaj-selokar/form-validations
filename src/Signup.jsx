@@ -19,6 +19,7 @@ const Signup = () => {
     const [userName, setUsername] = useState('');
     const [secureQuestion, setSecureQuestion] = useState('');
     const [secureQuestionAnswer, setSecureQuestionAnswer] = useState('');
+    const [latestId, setLatestId] = useState(10);
 
     // Default secure questions from config file
     const defaultSecureQuestions = [
@@ -27,8 +28,20 @@ const Signup = () => {
         'What is the city of your birth?',
     ];
 
+    const generateNumericId = () => {
+        return Math.floor(Math.random() * 100).toString();
+    };
 
     const handleSubmit = async () => {
+
+        // Check if username already exists
+        const usernameResponse = await axios.get(`http://localhost:8000/users?userName=${userName}`);
+        const existingUser = usernameResponse.data.length > 0;
+
+        if (existingUser) {
+            toast.error('Username already exists! Please choose a different username.');
+            return;
+        }
         // Is empty validations
         if (firstName === '') {
             setFirstNameError(true);
@@ -57,8 +70,12 @@ const Signup = () => {
             return;
         }
         setConfirmPasswordError(false);
+        
         try {
+            // const id = generateNumericId();
+            const id = (latestId + 1).toString();
             const formData = {
+                id,
                 firstName,
                 lastName,
                 password,
@@ -67,7 +84,9 @@ const Signup = () => {
                 secureQuestionAnswer,
             }
 
-            const response = await axios.post('http://localhost:8000/users', formData);
+            await axios.post('http://localhost:8000/users', formData);
+            // Update the state for latest ID
+            setLatestId(latestId + 1);
 
             // Clear form fields after successful submission
             setFirstName('');
@@ -84,19 +103,6 @@ const Signup = () => {
         }
 
 
-        // Convert data to JSON
-        // const jsonData = JSON.stringify(formData, null, 2);
-
-        // Create a Blob object
-        // const blob = new Blob([jsonData], { type: 'application/json' });
-
-        // Save the Blob object as a file
-        // saveAs(blob, 'signupData.json');
-
-        // toast.success('Form data saved successfully!');
-
-        // localStorage.setItem('formData', JSON.stringify(formData));
-        // toast.success('Form data saved successfully!');
     };
 
     return (
